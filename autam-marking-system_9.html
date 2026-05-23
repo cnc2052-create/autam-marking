@@ -464,7 +464,7 @@ window._NANUM_FONT = "AAEAAAARAQAABAAQRFNJRwAAAAEAH1pQAAAACEdQT1MAGQAMAB9Y3AAAAB
 let customers = [];
 let pdfs = {};
 let _tt;
-const DRIVE_API = 'https://script.google.com/macros/s/AKfycbxQpMU0UzLQEQWPrYUS1CCUx96JHr9pZw3Nla7hKkz5XruAiMvDxRiJVzMwLymKMi0RjA/exec';
+const DRIVE_API = 'https://script.google.com/macros/s/AKfyczbGYkQl_9BKPxbdI3lnS-rAtATfrDGJdsR00DIrYgv7HvCAUZYZrEKE51GakeNLGnFxQ/exec';
 
 // EmailJS 전역 설정
 window._EJS = {
@@ -991,8 +991,8 @@ async function runCore(sendEmail, mailType) {
           const arrVal = document.getElementById('arrivalDate')?.value || '';
           const dateVal0 = document.getElementById('date-0')?.value || '';
           const dateStr = mailType === 1
-            ? (arrVal ? fmtDate(arrVal).replace(/[()]/g,'') : '')
-            : (dateVal0 ? fmtDate(dateVal0).replace(/[()]/g,'') : '');
+            ? (arrVal ? fmtDate(arrVal) : '')
+            : (dateVal0 ? fmtDate(dateVal0) : '');
           const typeStr = mailType === 1 ? '입항예정' : '배차확정';
           const pdfName = `아우탐_${typeStr}_${dateStr}_${c.name}`;
           files.push({ fileName: pdfName + '.pdf', fileData: pdfBase64 });
