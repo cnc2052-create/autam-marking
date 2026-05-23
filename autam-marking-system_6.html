@@ -607,67 +607,28 @@ async function parsePDFMarkingFile(file) {
 
 // ── 구글 드라이브 PDF 업로드 ──
 async function uploadPDFtoDrive(pdfDoc, fileName) {
-  return new Promise((resolve) => {
-    try {
-      const pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
-
-      // iframe + form 방식으로 CORS 우회
-      const callbackName = 'driveCallback_' + Date.now();
-      
-      // JSONP 방식으로 GET 요청 (업로드는 별도)
-      // Apps Script에 데이터를 숨겨진 form으로 POST
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.name = callbackName;
-      document.body.appendChild(iframe);
-
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = DRIVE_API;
-      form.target = callbackName;
-      form.enctype = 'application/x-www-form-urlencoded';
-
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'payload';
-      input.value = JSON.stringify({
+  try {
+    const pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
+    const res = await fetch(DRIVE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         fileName: fileName + '.pdf',
         fileData: pdfBase64
-      });
-      form.appendChild(input);
-      document.body.appendChild(form);
-
-      // iframe 로드 완료 시 응답 파싱
-      let done = false;
-      iframe.onload = function() {
-        if (done) return;
-        done = true;
-        try {
-          const txt = iframe.contentDocument?.body?.innerText || '';
-          console.log('드라이브 응답:', txt);
-          const result = JSON.parse(txt);
-          resolve(result.success ? result.url : null);
-        } catch(e) {
-          console.error('응답 파싱 오류:', e);
-          resolve(null);
-        }
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-          document.body.removeChild(form);
-        }, 1000);
-      };
-
-      // 타임아웃 30초
-      setTimeout(() => {
-        if (!done) { done = true; resolve(null); }
-      }, 30000);
-
-      form.submit();
-    } catch(e) {
-      console.error('드라이브 업로드 오류:', e);
-      resolve(null);
+      })
+    });
+    const result = await res.json();
+    console.log('드라이브 응답:', result);
+    if (result.success) {
+      return result.url;
+    } else {
+      console.error('드라이브 업로드 실패:', result.error);
+      return null;
     }
-  });
+  } catch(e) {
+    console.error('드라이브 업로드 오류:', e);
+    return null;
+  }
 }
 
 // ── 구글시트에서 고객사 수령정보 가져오기 ──
@@ -843,7 +804,7 @@ function parseCNO(cno) {
   return [{cur:cno,total:null}];
 }
 
-function generatePDF(customer, delivDate, delivTime, memo, mailType) {
+function generatePDF(customer, delivDate, delivTime, memo, mailType, arrivalDate) {
   // 나눔고딕으로 한글 텍스트 출력
   function koreanText(doc, text, x, y, options={}) {
     const fontSize = options.fontSize || 10;
@@ -891,9 +852,10 @@ function generatePDF(customer, delivDate, delivTime, memo, mailType) {
     doc.setFont('helvetica','normal');
     doc.setFontSize(9.5);
     doc.setTextColor(30, 70, 45);
+    const arrivalLabel = arrivalDate ? fmtDate(arrivalDate) : dateLabel;
     const delivLabel = mailType===2
       ? `배송: ${dateLabel}  ${delivTime}`
-      : `입항 예정일: ${dateLabel}`;
+      : `입항 예정일: ${arrivalLabel}`;
     koreanText(doc, delivLabel, mg+6, mg+14, {fontSize:13, bold:true, color:'#1e4632'});
     koreanText(doc, `배송주소: ${customer.address||'N/A'}`, mg+6, mg+25, {fontSize:13, bold:true, color:'#1e4632'});
     koreanText(doc, `수령인: ${customer.recipient||'N/A'}  /  ${customer.contact||'N/A'}`, mg+6, mg+36, {fontSize:13, bold:true, color:'#1e4632'});
@@ -997,7 +959,8 @@ async function runCore(sendEmail, mailType) {
     if (!c.address)   { const el=document.getElementById(`addr-${i}`); if(el) c.address=el.value.trim(); }
     setRowSt(i,'proc');
     log(`PDF 생성: ${c.name}  (${fmtDate(dv)} ${tv})`);
-    try { pdfs[c.name]=generatePDF(c,dv,tv,mv,sendEmail?mailType:0); setRowSt(i,'done'); log(`✓ 완료: ${c.name}`,'s'); }
+    try { const _arrVal = document.getElementById('arrivalDate') ? document.getElementById('arrivalDate').value : '';
+      pdfs[c.name]=generatePDF(c,dv,tv,mv,sendEmail?mailType:0,_arrVal); setRowSt(i,'done'); log(`✓ 완료: ${c.name}`,'s'); }
     catch(e) { setRowSt(i,'err'); log(`✗ 실패: ${c.name} — ${e.message}`,'e'); }
     await sleep(220);
   }
