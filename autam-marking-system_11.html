@@ -843,7 +843,7 @@ function generatePDF(customer, delivDate, delivTime, memo, mailType, arrivalDate
     doc.setTextColor(30, 70, 45);
     const arrivalLabel = arrivalDate ? fmtDate(arrivalDate) : dateLabel;
     const delivLabel = mailType===2
-      ? `배송: ${dateLabel}  ${delivTime}`
+      ? `배송일: ${dateLabel}  ${delivTime}`
       : `입항 예정일: ${arrivalLabel}`;
     koreanText(doc, delivLabel, mg+6, mg+14, {fontSize:13, bold:true, color:'#1e4632'});
     koreanText(doc, `배송주소: ${customer.address||'N/A'}`, mg+6, mg+25, {fontSize:13, bold:true, color:'#1e4632'});
