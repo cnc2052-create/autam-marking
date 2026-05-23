@@ -491,11 +491,7 @@ window._EJS = {
   z.addEventListener('dragleave', () => z.classList.remove('drag'));
   z.addEventListener('drop', e => {
     e.preventDefault(); z.classList.remove('drag');
-    const dt = new DataTransfer();
-    Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
-    const inp = document.getElementById('fileInput');
-    inp.files = dt.files;
-    handleFiles({target: inp});
+    handleFiles({target: {files: e.dataTransfer.files}});
   });
 })();
 
@@ -1103,4 +1099,7 @@ function resetAll() {
   document.getElementById('uploadDesc').textContent='업체별 .xls 파일 여러 개를 한번에 드래그하거나 클릭하여 선택';
   document.getElementById('countPill').textContent='0건';
   document.getElementById('bulkBar').classList.remove('show');
-  document.getElementById('tbody').innerHTML=`<tr><td colspan="9"><div class="empty"><div class="empty-ic">📋</div>마킹 엑셀을 업로드하면 고객사 목록이 표시됩니다</
+  document.getElementById('tbody').innerHTML=`<tr><td colspan="9"><div class="empty"><div class="empty-ic">📋</div>마킹 엑셀을 업로드하면 고객사 목록이 표시됩니다</div></td></tr>`;
+  document.getElementById('btn1').disabled=true;
+  document.getElementById('btn2').disabled=true;
+  document.getElementById('pdfBtn').disabl
