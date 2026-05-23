@@ -487,11 +487,18 @@ window._EJS = {
   document.getElementById('bulkDate').value = new Date().toISOString().split('T')[0];
   const _ad = document.getElementById('arrivalDate'); if(_ad) _ad.value = new Date().toISOString().split('T')[0];
   const z = document.getElementById('uploadZone');
-  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('drag'); });
-  z.addEventListener('dragleave', () => z.classList.remove('drag'));
-  z.addEventListener('drop', e => {
-    e.preventDefault(); z.classList.remove('drag');
-    handleFiles({target: {files: e.dataTransfer.files}});
+  const inp = document.getElementById('fileInput');
+  // 드래그 이벤트: div와 input 양쪽에 걸어 확실하게 처리
+  [z, inp].forEach(el => {
+    el.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); z.classList.add('drag'); });
+    el.addEventListener('dragleave', e => { e.stopPropagation(); z.classList.remove('drag'); });
+    el.addEventListener('drop', e => {
+      e.preventDefault(); e.stopPropagation(); z.classList.remove('drag');
+      const droppedFiles = e.dataTransfer.files;
+      if (droppedFiles && droppedFiles.length > 0) {
+        handleFiles({target: {files: droppedFiles}});
+      }
+    });
   });
 })();
 
@@ -510,7 +517,9 @@ function downloadTemplate() {
 }
 
 function handleFiles(e) {
-  const files = Array.from(e.target.files).filter(f => /\.(xlsx|xls|pdf)$/i.test(f.name));
+  const allFiles = Array.from(e.target.files || []);
+  if (!allFiles.length) { toast('파일을 인식하지 못했습니다. 다시 시도해주세요.','err'); return; }
+  const files = allFiles.filter(f => /\.(xlsx|xls|pdf)$/i.test(f.name));
   if (!files.length) { toast('엑셀 파일만 업로드 가능','err'); return; }
   customers = [];
   let done = 0;
@@ -1096,10 +1105,4 @@ function resetAll() {
   z.classList.remove('has-file','drag');
   document.getElementById('uploadIcon').textContent='📂';
   document.getElementById('uploadTitle').textContent='마킹 엑셀 파일을 업로드하세요';
-  document.getElementById('uploadDesc').textContent='업체별 .xls 파일 여러 개를 한번에 드래그하거나 클릭하여 선택';
-  document.getElementById('countPill').textContent='0건';
-  document.getElementById('bulkBar').classList.remove('show');
-  document.getElementById('tbody').innerHTML=`<tr><td colspan="9"><div class="empty"><div class="empty-ic">📋</div>마킹 엑셀을 업로드하면 고객사 목록이 표시됩니다</div></td></tr>`;
-  document.getElementById('btn1').disabled=true;
-  document.getElementById('btn2').disabled=true;
-  document.getElementById('pdfBtn').disabl
+  document.getElementById('uploadDesc').textContent='업체별 .xls 파일 여러 개를 한번에 드래
