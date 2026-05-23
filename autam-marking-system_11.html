@@ -461,9 +461,14 @@ window._NANUM_FONT = "AAEAAAARAQAABAAQRFNJRwAAAAEAH1pQAAAACEdQT1MAGQAMAB9Y3AAAAB
 <div class="toast" id="toast"></div>
 
 <script>
+// 브라우저 기본 파일 열기 방지 (stopPropagation 없이 — zone 핸들러까지 이벤트 전달)
+window.addEventListener('dragover', function(e){ e.preventDefault(); });
+window.addEventListener('drop', function(e){ e.preventDefault(); });
+
 let customers = [];
 let pdfs = {};
 let _tt;
+let _lastMailType = 0;
 const DRIVE_API = 'https://script.google.com/macros/s/AKfycbzKCoWrYBaTiipLF3hEJSNOvDsjhGNOrNwV_A1AfJy7HwabQeKldDO2-YCWqsJvnkmDNA/exec';
 
 // EmailJS 전역 설정
@@ -487,18 +492,15 @@ window._EJS = {
   document.getElementById('bulkDate').value = new Date().toISOString().split('T')[0];
   const _ad = document.getElementById('arrivalDate'); if(_ad) _ad.value = new Date().toISOString().split('T')[0];
   const z = document.getElementById('uploadZone');
-  const inp = document.getElementById('fileInput');
-  // 드래그 이벤트: div와 input 양쪽에 걸어 확실하게 처리
-  [z, inp].forEach(el => {
-    el.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); z.classList.add('drag'); });
-    el.addEventListener('dragleave', e => { e.stopPropagation(); z.classList.remove('drag'); });
-    el.addEventListener('drop', e => {
-      e.preventDefault(); e.stopPropagation(); z.classList.remove('drag');
-      const droppedFiles = e.dataTransfer.files;
-      if (droppedFiles && droppedFiles.length > 0) {
-        handleFiles({target: {files: droppedFiles}});
-      }
-    });
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('drag'); });
+  z.addEventListener('dragleave', () => z.classList.remove('drag'));
+  z.addEventListener('drop', e => {
+    e.preventDefault(); z.classList.remove('drag');
+    const dt = new DataTransfer();
+    Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+    const inp = document.getElementById('fileInput');
+    inp.files = dt.files;
+    handleFiles({target: inp});
   });
 })();
 
@@ -517,9 +519,7 @@ function downloadTemplate() {
 }
 
 function handleFiles(e) {
-  const allFiles = Array.from(e.target.files || []);
-  if (!allFiles.length) { toast('파일을 인식하지 못했습니다. 다시 시도해주세요.','err'); return; }
-  const files = allFiles.filter(f => /\.(xlsx|xls|pdf)$/i.test(f.name));
+  const files = Array.from(e.target.files).filter(f => /\.(xlsx|xls|pdf)$/i.test(f.name));
   if (!files.length) { toast('엑셀 파일만 업로드 가능','err'); return; }
   customers = [];
   let done = 0;
@@ -917,7 +917,7 @@ function generatePDF(customer, delivDate, delivTime, memo, mailType, arrivalDate
   return doc;
 }
 
-async function runSend(type) { await runCore(true, type); }
+async function runSend(type) { _lastMailType = type; await runCore(true, type); }
 async function runPDFOnly()  { await runCore(false, 0); }
 
 async function runCore(sendEmail, mailType) {
@@ -959,20 +959,6 @@ async function runCore(sendEmail, mailType) {
     await sleep(220);
   }
   setStep(2,'done'); await sleep(300);
-
-  // PDF 생성 직후 처리결과 즉시 표시 (1차·2차 모두 보장)
-  document.getElementById('resultSec').style.display='block';
-  document.getElementById('resultGrid').innerHTML = customers.map(c => {
-    const ok=!!pdfs[c.name];
-    return `<div class="result-card ${ok?'ok':'err'}">
-      <div class="rc-name">${c.name}</div>
-      <div class="rc-detail">품목 ${c.items.length}건<br>${c.address||'주소 미입력'}</div>
-      <div class="rc-btm">
-        <span class="badge ${ok?'b-pdf':'b-err'}">${ok?'PDF생성':'오류'}</span>
-        ${ok?`<button class="btn-dl" onclick="dlPDF('${c.name}')">↓ PDF</button>`:'<span style="font-size:11px;color:var(--text3)">PDF 없음</span>'}
-      </div>
-    </div>`;
-  }).join('');
 
   setStep(3,'active');
   if (sendEmail) {
@@ -1090,9 +1076,9 @@ function dlPDF(name) {
     const dateVal0=document.getElementById('date-0')?.value||'';
     const days=['일','월','화','수','목','금','토'];
     function _fmt(s){if(!s)return'';const dt=new Date(s);return String(dt.getMonth()+1).padStart(2,'0')+'월 '+String(dt.getDate()).padStart(2,'0')+'일('+days[dt.getDay()]+')';}
-    const dateStr=arrVal?_fmt(arrVal):(dateVal0?_fmt(dateVal0):'');
-    const typeStr=arrVal?'입항예정':'배송';
-    const fname=dateStr?`아우탐 ${typeStr}일 ${dateStr}_${name}.pdf`:`아우탐_${name}.pdf`;
+    const dateStr=_lastMailType===2?(dateVal0?_fmt(dateVal0):''):(arrVal?_fmt(arrVal):(dateVal0?_fmt(dateVal0):''));
+    const typeStr=_lastMailType===2?'배차일정':(arrVal?'입항예정':'배송');
+    const fname=dateStr?`아우탐 ${typeStr} ${dateStr}_${name}.pdf`:`아우탐_${name}.pdf`;
     d.save(fname);
     toast(`${name} 다운로드`,'ok');
   }
@@ -1105,4 +1091,23 @@ function resetAll() {
   z.classList.remove('has-file','drag');
   document.getElementById('uploadIcon').textContent='📂';
   document.getElementById('uploadTitle').textContent='마킹 엑셀 파일을 업로드하세요';
-  document.getElementById('uploadDesc').textContent='업체별 .xls 파일 여러 개를 한번에 드래
+  document.getElementById('uploadDesc').textContent='업체별 .xls 파일 여러 개를 한번에 드래그하거나 클릭하여 선택';
+  document.getElementById('countPill').textContent='0건';
+  document.getElementById('bulkBar').classList.remove('show');
+  document.getElementById('tbody').innerHTML=`<tr><td colspan="9"><div class="empty"><div class="empty-ic">📋</div>마킹 엑셀을 업로드하면 고객사 목록이 표시됩니다</div></td></tr>`;
+  document.getElementById('btn1').disabled=true;
+  document.getElementById('btn2').disabled=true;
+  document.getElementById('pdfBtn').disabled=true;
+  document.getElementById('progressBox').classList.remove('show');
+  document.getElementById('logWrap').classList.remove('show');
+  document.getElementById('resultSec').style.display='none';
+  [1,2,3,4].forEach(n=>{document.getElementById(`s${n}`).className='step'; document.getElementById(`s${n}i`).textContent=n;});
+  toast('초기화 완료');
+}
+function toast(msg,type='') {
+  const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast ${type} show`;
+  clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>
